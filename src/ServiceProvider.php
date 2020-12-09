@@ -4,24 +4,34 @@ namespace Otiumtek\ShopCartLaravel;
 
 class ServiceProvider extends \Illuminate\Support\ServiceProvider
 {
-    const CONFIG_PATH = __DIR__ . '/../config/shop-cart-laravel.php';
 
     public function boot()
     {
-        $this->publishes([
-            self::CONFIG_PATH => config_path('shop-cart-laravel.php'),
-        ], 'config');
+
     }
 
     public function register()
     {
-        $this->mergeConfigFrom(
-            self::CONFIG_PATH,
-            'shop-cart-laravel'
-        );
+        $this->app->bind('cart', 'Otiumtek\ShopCartLaravel\Cart');
 
-        $this->app->bind('shop-cart-laravel', function () {
-            return new ShopCartLaravel();
+        $config = __DIR__ . '/../config/cart.php';
+        $this->mergeConfigFrom($config, 'cart');
+
+        $this->publishes([__DIR__ . '/../config/cart.php' => config_path('cart.php')], 'config');
+
+        $this->app['events']->listen(Logout::class, function () {
+            if ($this->app['config']->get('cart.destroy_on_logout')) {
+                $this->app->make(SessionManager::class)->forget('cart');
+            }
         });
+
+        if ( ! class_exists('CreateShoppingcartTable')) {
+            // Publish the migration
+            $timestamp = date('Y_m_d_His', time());
+
+            $this->publishes([
+                __DIR__.'/../database/migrations/0000_00_00_000000_create_shoppingcart_table.php' => database_path('migrations/'.$timestamp.'_create_shoppingcart_table.php'),
+            ], 'migrations');
+        }
     }
 }
